@@ -1,0 +1,71 @@
+import requests
+from bs4 import BeautifulSoup
+import csv
+CSV = 'stoli.csv'
+URL = 'ссылка на необходимую страницу'
+HOST =  'сылка на домен'
+HEADRESS = {
+    'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+    'useragent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36 OPR/96.0.0.0'
+}
+def validator(func):
+    def wrapper():
+        print('Начинаем')
+        func()
+        print('Конец')
+    return wrapper
+
+
+def get_html(url, params=''):
+    r = requests.get(url, headers=HEADRESS, params=params)
+    return r
+
+
+def get_content(html):
+    j = 0
+    soup = BeautifulSoup(html, 'html.parser')
+    items = soup.find_all('div', class_='elements__item')
+    inf = []
+    for item in items:
+        inf.append(
+            {
+            'name':item.find('div', class_='element__content').find('a').get_text(strip=True),
+            'price':item.find('div', class_='price__value').get_text(),
+            'img':HOST + item.find('div', class_='element').find('img').get('src')
+            }
+        )
+        href = get_html(HOST + item.find('div', class_='element').find('a').get('href'))
+        soup2 = BeautifulSoup(href.text, 'html.parser')
+        gabaryt = soup2.find_all('div', class_='detail__prop prop')
+        for el in gabaryt:
+            k = el.find('div', class_='prop__value').get_text()
+        opisanie = soup2.find_all('div', class_='catalog')
+        for el in opisanie:
+            o = el.find('div', class_='detail').get_text(strip=True)
+        gabaryt_func(inf[j], k, o)
+        j+=1
+    return inf
+
+def gabaryt_func(el, k, o):
+    el['gabaryt'] = k
+    el['opisanie'] = o
+
+def save_doc(items, path):
+    with open(path, 'w', newline='') as file:
+        writer = csv.writer(file, delimiter=';')
+        writer.writerow(['Имя стола', 'Прайс', 'Картинка', 'Габариты', 'Описание'])
+        for item in items:
+            writer.writerow([item['name'], item['price'], item['img'], item['gabaryt'], item['opisanie']])
+
+@validator
+def parser():
+    html = get_html(URL)
+    if html.status_code == 200:
+        inf = []
+        html = get_html(URL)
+        inf.extend(get_content(html.text))
+        save_doc(inf, CSV)
+    else:
+        print('Error')
+
+parser()
